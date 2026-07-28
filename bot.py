@@ -63,7 +63,7 @@ def handle_number(message):
                             total += 1
                     except:
                         pass
-                    time.sleep(random.uniform(1.5, 4.0))
+                    time.sleep(random.uniform(1.5, 2.5))
         finally:
             if chat_id in active:
                 del active[chat_id]
