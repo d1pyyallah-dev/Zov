@@ -26,7 +26,7 @@ def stop(m):
 @bot.message_handler(func=lambda m: True)
 def handle(m):
     phone = ''.join(filter(str.isdigit, m.text.strip()))
-    if len(phone) < 10000:
+    if len(phone) < 10:
         bot.reply_to(m, "не номер")
         return
     if m.chat.id in active:
