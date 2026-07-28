@@ -4,8 +4,10 @@ import requests
 import threading
 import re
 from concurrent.futures import ThreadPoolExecutor
+import time
 
 bot = telebot.TeleBot("8676884588:AAFy8GLWAfTExVAqHLbbf_qIOPPxgNkQOfE")
+bot.remove_webhook()
 
 USER_AGENTS = [
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
@@ -102,4 +104,8 @@ def fallback(m):
         bot.reply_to(m, "chego nado /start ili /stop")
 
 if __name__ == '__main__':
-    bot.infinity_polling()
+    while True:
+        try:
+            bot.infinity_polling(timeout=20, long_polling_timeout=20)
+        except:
+            time.sleep(5)
