@@ -1,7 +1,9 @@
 import telebot
 import requests
 from fake_useragent import UserAgent
+import time
 import threading
+import random
 
 bot = telebot.TeleBot("8676884588:AAFy8GLWAfTExVAqHLbbf_qIOPPxgNkQOfE")
 
@@ -47,6 +49,7 @@ def handle(m):
                         requests.post(ep, headers=headers, data=data, timeout=10)
                     except:
                         pass
+                    time.sleep(random.uniform(1.5, 2.5))
         finally:
             if chat_id in active:
                 del active[chat_id]
